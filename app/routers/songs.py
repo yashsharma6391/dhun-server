@@ -288,12 +288,14 @@ async def delete_song_by_id(
     song_id: str,
     current_user: User = Depends(get_current_user)
 ):
+    """Delete song and all files from Cloudinary"""
     songs_col = get_songs_collection()
     song = await songs_col.find_one({"id": song_id})
 
     if not song:
         raise HTTPException(status_code=404, detail="Song not found")
 
+    # Check ownership
     channel_id = song.get("channel_id")
     if channel_id:
         channels_col = get_channels_collection()
@@ -307,10 +309,34 @@ async def delete_song_by_id(
                 detail="Not authorized to delete this song"
             )
 
+    # FIXED: Delete all files from Cloudinary
+    try:
+        from app.storage.factory import get_storage
+        storage = get_storage()
+
+        audio_file_id = song.get("audio_file_id")
+        if audio_file_id:
+            await storage.delete_file(audio_file_id)
+            logger.info(f"Deleted audio: {audio_file_id}")
+
+        cover_file_id = song.get("cover_file_id")
+        if cover_file_id:
+            await storage.delete_file(cover_file_id)
+            logger.info(f"Deleted cover: {cover_file_id}")
+
+        lyrics_file_id = song.get("lyrics_file_id")
+        if lyrics_file_id:
+            await storage.delete_file(lyrics_file_id)
+            logger.info(f"Deleted lyrics: {lyrics_file_id}")
+
+    except Exception as e:
+        logger.error(f"Storage delete error: {e}")
+
+    # Mark inactive in MongoDB
     await songs_col.update_one(
         {"id": song_id},
         {"$set": {"is_active": False}}
     )
 
-    logger.info(f"Song deleted: {song_id}")
-    return {"success": True, "message": "Song deleted"}
+    logger.info(f"Song fully deleted: {song_id}")
+    return {"success": True, "message": "Song and all files deleted"}

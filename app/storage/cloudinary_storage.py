@@ -113,14 +113,32 @@ class CloudinaryStorage(BaseStorage):
             raise
 
     async def delete_file(self, file_id: str) -> bool:
-        self.initialize()
-        try:
-            cloudinary.uploader.destroy(file_id)
-            logger.info(f"Deleted from Cloudinary: {file_id}")
-            return True
-        except Exception as e:
-            logger.warning(f"Cloudinary delete error: {e}")
-            return False
+     self.initialize()
+     if not file_id:
+        return True
+     try:
+        # FIXED: Detect resource type from file_id path
+        # dhun/audio/... → resource_type = "video" (Cloudinary uses video for audio)
+        # dhun/covers/... → resource_type = "image"
+        # dhun/lyrics/... → resource_type = "raw"
+        if "audio" in file_id:
+            resource_type = "video"
+        elif "covers" in file_id:
+            resource_type = "image"
+        elif "lyrics" in file_id:
+            resource_type = "raw"
+        else:
+            resource_type = "raw"
+
+        result = cloudinary.uploader.destroy(
+            file_id,
+            resource_type=resource_type
+        )
+        logger.info(f"Deleted from Cloudinary: {file_id} result:{result}")
+        return True
+     except Exception as e:
+        logger.warning(f"Cloudinary delete error: {e}")
+        return False
 
     def get_provider_name(self) -> str:
         return "cloudinary"
