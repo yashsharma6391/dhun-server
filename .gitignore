@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+venv/
+env/
+ENV/
+.Python
+build/
+dist/
+*.egg-info/
+
+# SECRETS - NEVER COMMIT THESE
+.env
+*.env
+.env.*
+
+# Credentials - NEVER COMMIT
+firebase_credentials.json
+google_credentials.json
+service_account.json
+*_credentials.json
+*_service_account.json
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Local upload files
+# (production files are on Cloudinary)
+uploads/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
