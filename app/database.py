@@ -59,13 +59,13 @@
 # All data now in MongoDB
 # This file exists only for backward compatibility
 
-class FakeBase:
-    """Fake SQLAlchemy Base - does nothing"""
-    metadata = type('obj', (object,), {
-        'create_all': staticmethod(lambda bind: None)
-    })()
+# class FakeBase:
+#     """Fake SQLAlchemy Base - does nothing"""
+#     metadata = type('obj', (object,), {
+#         'create_all': staticmethod(lambda bind: None)
+#     })()
 
-Base = FakeBase()
+# Base = FakeBase()
 
 def get_db():
     """No-op - kept for backward compatibility"""
