@@ -478,7 +478,7 @@ async def delete_song(
     song_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    """Owner deletes a song and all its files from Cloudinary"""
+    """Owner deletes song - removes from MongoDB + Cloudinary"""
     channels_col = get_channels_collection()
     channel = await channels_col.find_one({
         "id": channel_id,
@@ -500,43 +500,62 @@ async def delete_song(
     if not song:
         raise HTTPException(status_code=404, detail="Song not found")
 
-    # FIXED: Delete files from Cloudinary
-    storage_provider = song.get("storage_provider", "cloudinary")
-    
+    # Step 1: Delete files from storage
+    deleted_files = []
+    failed_files = []
+
     try:
         from app.storage.factory import get_storage
         storage = get_storage()
-        
-        # Delete audio file
+
         audio_file_id = song.get("audio_file_id")
         if audio_file_id:
-            await storage.delete_file(audio_file_id)
-            logger.info(f"Deleted audio from {storage_provider}: {audio_file_id}")
-        
-        # Delete cover image
+            success = await storage.delete_file(audio_file_id)
+            if success:
+                deleted_files.append("audio")
+                logger.info(f"✅ Audio deleted: {audio_file_id}")
+            else:
+                failed_files.append("audio")
+                logger.error(f"❌ Audio delete failed: {audio_file_id}")
+
         cover_file_id = song.get("cover_file_id")
         if cover_file_id:
-            await storage.delete_file(cover_file_id)
-            logger.info(f"Deleted cover from {storage_provider}: {cover_file_id}")
-        
-        # Delete lyrics file
+            success = await storage.delete_file(cover_file_id)
+            if success:
+                deleted_files.append("cover")
+                logger.info(f"✅ Cover deleted: {cover_file_id}")
+            else:
+                failed_files.append("cover")
+
         lyrics_file_id = song.get("lyrics_file_id")
         if lyrics_file_id:
-            await storage.delete_file(lyrics_file_id)
-            logger.info(f"Deleted lyrics from {storage_provider}: {lyrics_file_id}")
-            
-    except Exception as e:
-        logger.error(f"Error deleting files from storage: {e}")
-        # Continue with DB deletion even if storage fails
+            success = await storage.delete_file(lyrics_file_id)
+            if success:
+                deleted_files.append("lyrics")
+                logger.info(f"✅ Lyrics deleted: {lyrics_file_id}")
+            else:
+                failed_files.append("lyrics")
 
-    # Soft delete in MongoDB
-    await songs_col.update_one(
-        {"id": song_id},
-        {"$set": {"is_active": False}}
+    except Exception as e:
+        logger.error(f"Storage delete error: {e}")
+
+    # Step 2: HARD DELETE from MongoDB (not soft delete)
+    await songs_col.delete_one({"id": song_id})
+
+    # Step 3: Also delete related likes
+    from app.mongodb import get_likes_collection
+    likes_col = get_likes_collection()
+    await likes_col.delete_many({"song_id": song_id})
+
+    logger.info(
+        f"Song {song_id} deleted. "
+        f"Files deleted: {deleted_files}. "
+        f"Failed: {failed_files}"
     )
 
-    logger.info(f"Song deleted: {song_id} + all files")
     return {
         "success": True,
-        "message": "Song and all files deleted"
+        "message": "Song deleted",
+        "deleted_files": deleted_files,
+        "failed_files": failed_files
     }
